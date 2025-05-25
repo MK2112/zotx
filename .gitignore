@@ -1,0 +1,7 @@
+
+.gradle/*
+app/build/*
+*.hprof
+local.properties
+build/reports/*
+gradle/wrapper/*

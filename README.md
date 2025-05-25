@@ -2,7 +2,7 @@
 
 With my [Zotero](https://www.zotero.org/) setup, all my PDFs are managed as attachments via [ZotMoov](https://github.com/wileyyugioh/zotmoov). The Zotero library itself doesn't hold a single PDF. Instead, it links to the PDFs stored in a folder on my computer. I organize and read in Zotero, and sometimes take notes in [Obsidian](https://obsidian.md), linking everything together with [BetterBibTeX](https://retorque.re/zotero-better-bibtex/).
 
-**What about integrating that with Android?** Moving/Syncing PDFs to your Android device is quickly done, but then also knowing which file contains which paper, and wether you read it or not, isn't. **ZotX** solves that.
+**What about integrating that with Android?** Moving/Syncing PDFs to your Android device is quickly done, but then also knowing which file contains which paper, and wether you already read it or not, isn't. **ZotX** solves that.
 
 ## Quick Start
 

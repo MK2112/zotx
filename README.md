@@ -1,4 +1,7 @@
 # ZotX
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](LICENSE_INDIVIDUAL)
+[![Platform](https://img.shields.io/badge/platform-Android-blue)](#requirements)
+[![Pre-release](https://img.shields.io/github/v/release/MK2112/zotx?include_prereleases&label=pre-release)](https://github.com/MK2112/zotx/releases)
 
 > **ZotX** is an Android app that links your synced `.pdf`s with their metadata from a `.bib` file, letting you search, browse, and read your papers.
 

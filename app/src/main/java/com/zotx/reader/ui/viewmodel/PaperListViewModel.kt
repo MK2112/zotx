@@ -40,18 +40,35 @@ class PaperListViewModel(
         get() = repository
         
     /**
-     * Toggles the read status of a paper
-     * @param paperId The ID of the paper to toggle
-     * @param isRead The new read status
+     * Toggles the status of a paper
+     * @param paperId The ID of the paper to update
+     * @param statusType The type of status to update ("read", "toread", "favorite")
+     * @param isActive Whether the status should be active or not
      */
-    fun togglePaperReadStatus(paperId: String, isRead: Boolean) {
+    fun togglePaperStatus(paperId: String, statusType: String, isActive: Boolean) {
         viewModelScope.launch {
             try {
-                repository.togglePaperReadStatus(paperId, isRead)
+                repository.togglePaperStatus(paperId, statusType, isActive)
             } catch (e: Exception) {
-                Log.e(TAG, "Error toggling read status for paper $paperId", e)
+                Log.e(TAG, "Error toggling $statusType status for paper $paperId", e)
                 _uiState.update { it.copy(
-                    error = "Failed to update read status: ${e.message}"
+                    error = "Failed to update status: ${e.message}"
+                )}
+            }
+        }
+    }
+
+    /**
+     * Clears all statuses for all papers
+     */
+    fun clearAllStatuses() {
+        viewModelScope.launch {
+            try {
+                repository.clearAllStatuses()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error clearing paper statuses", e)
+                _uiState.update { it.copy(
+                    error = "Failed to clear statuses: ${e.message}"
                 )}
             }
         }
@@ -334,8 +351,17 @@ class PaperListViewModel(
         appPreferences.clearPreferences()
         _savedBibFileUri = null
         _savedPdfFolderUri = null
-        // Clear all read statuses when clearing saved URIs
-        repository.clearAllReadStatuses()
+        // Clear all statuses when clearing saved URIs
+        viewModelScope.launch {
+            try {
+                repository.clearAllStatuses()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error clearing paper statuses", e)
+                _uiState.update { it.copy(
+                    error = "Failed to clear statuses: ${e.message}"
+                )}
+            }
+        }
         _uiState.update { it.copy(papers = emptyList()) }
     }
 }

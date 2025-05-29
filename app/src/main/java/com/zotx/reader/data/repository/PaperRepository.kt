@@ -37,12 +37,17 @@ class PaperRepository(
     private val papersLock = Any()
     private val _papersFlow = MutableStateFlow<List<Paper>>(emptyList())
     
-    // DataStore for persisting read status
+    // DataStore for persisting paper statuses
     private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "paper_status")
-    private val readStatusKey = booleanPreferencesKey("paper_read_")
     
-    // In-memory cache of read status
-    private val readStatusCache = mutableMapOf<String, Boolean>()
+    // In-memory cache of paper statuses
+    data class PaperStatuses(
+        val isRead: Boolean = false,
+        val toRead: Boolean = false,
+        val isFavorite: Boolean = false
+    )
+    
+    private val statusCache = mutableMapOf<String, PaperStatuses>()
 
     init {
         // Start loading read statuses when the repository is created
@@ -58,9 +63,13 @@ class PaperRepository(
 
     private fun updatePapersFlow() {
         synchronized(papersLock) {
-            // Update papers with their read status from cache
+            // Update papers with their status from cache
             _papersFlow.value = _papers.map { paper ->
-                paper.markAsRead(readStatusCache[paper.id] ?: false)
+                val status = statusCache[paper.id] ?: PaperStatuses()
+                paper
+                    .markAsRead(status.isRead)
+                    .markAsToRead(status.toRead)
+                    .markAsFavorite(status.isFavorite)
             }
         }
     }
@@ -73,40 +82,55 @@ class PaperRepository(
             val preferences = context.dataStore.data.first()
             
             // Clear the cache first to avoid stale data
-            readStatusCache.clear()
+            statusCache.clear()
             
-            // Load all read statuses into the cache
+            // Load all statuses into the cache
             preferences.asMap().forEach { (key, value) ->
-                if (key.name.startsWith("paper_read_")) {
-                    val paperId = key.name.substringAfter("paper_read_")
+                val parts = key.name.split("_")
+                if (parts.size >= 3 && parts[0] == "paper" && parts[1] in listOf("read", "toread", "favorite")) {
+                    val paperId = parts.drop(2).joinToString("_")
+                    val status = statusCache.getOrPut(paperId) { PaperStatuses() }
                     @Suppress("UNCHECKED_CAST")
-                    readStatusCache[paperId] = (value as? Boolean) ?: false
+                    when (parts[1]) {
+                        "read" -> statusCache[paperId] = status.copy(isRead = (value as? Boolean) ?: false)
+                        "toread" -> statusCache[paperId] = status.copy(toRead = (value as? Boolean) ?: false)
+                        "favorite" -> statusCache[paperId] = status.copy(isFavorite = (value as? Boolean) ?: false)
+                    }
                 }
             }
             
             // Update the papers flow with the loaded statuses
             updatePapersFlow()
         } catch (e: Exception) {
-            Log.e("PaperRepository", "Error loading read statuses", e)
+            Log.e("PaperRepository", "Error loading paper statuses", e)
             // Re-throw to be handled by the ViewModel
             throw e
         }
     }
     
-    suspend fun togglePaperReadStatus(paperId: String, isRead: Boolean) {
+    private suspend fun updatePaperStatus(paperId: String, status: PaperStatuses) {
         try {
             // Update cache
-            readStatusCache[paperId] = isRead
+            statusCache[paperId] = status
             
             // Persist to DataStore
             context.dataStore.edit { preferences ->
-                preferences[booleanPreferencesKey("paper_read_$paperId")] = isRead
+                preferences[booleanPreferencesKey("paper_read_$paperId")] = status.isRead
+                preferences[booleanPreferencesKey("paper_toread_$paperId")] = status.toRead
+                preferences[booleanPreferencesKey("paper_favorite_$paperId")] = status.isFavorite
             }
             
-            // Update the papers with the new read status
+            // Update the papers with the new status
             synchronized(papersLock) {
                 _papers.replaceAll { paper ->
-                    if (paper.id == paperId) paper.markAsRead(isRead) else paper
+                    if (paper.id == paperId) {
+                        paper
+                            .markAsRead(status.isRead)
+                            .markAsToRead(status.toRead)
+                            .markAsFavorite(status.isFavorite)
+                    } else {
+                        paper
+                    }
                 }
                 // Update the flow with the modified papers
                 _papersFlow.value = _papers.toList()
@@ -118,33 +142,50 @@ class PaperRepository(
         }
     }
     
+    suspend fun togglePaperStatus(paperId: String, statusType: String, isActive: Boolean) {
+        val currentStatus = statusCache[paperId] ?: PaperStatuses()
+        val newStatus = when (statusType) {
+            "read" -> currentStatus.copy(isRead = isActive, toRead = false)
+            "toread" -> currentStatus.copy(toRead = isActive, isRead = false)
+            "favorite" -> currentStatus.copy(isFavorite = isActive, isRead = isActive || currentStatus.isRead)
+            else -> return
+        }
+        updatePaperStatus(paperId, newStatus)
+    }
+    
     /**
-     * Clears all read statuses for all papers
+     * Clears all statuses for all papers
      */
-    suspend fun clearAllReadStatuses() {
+    suspend fun clearAllStatuses() {
         try {
             // Clear the in-memory cache
-            readStatusCache.clear()
+            statusCache.clear()
             
-            // Get all keys from DataStore and filter for read status keys
+            // Get all keys from DataStore and filter for status keys
             val allPreferences = context.dataStore.data.first()
-            val readStatusKeys = allPreferences.asMap().keys
-                .filter { it.name.startsWith("paper_read_") }
+            val statusKeys = allPreferences.asMap().keys
+                .filter { it.name.startsWith("paper_") && 
+                        (it.name.startsWith("paper_read_") || 
+                         it.name.startsWith("paper_toread_") || 
+                         it.name.startsWith("paper_favorite_")) }
                 .toSet()
             
-            // Remove all read status keys
-            if (readStatusKeys.isNotEmpty()) {
+            // Remove all status keys
+            if (statusKeys.isNotEmpty()) {
                 context.dataStore.edit { preferences ->
-                    readStatusKeys.forEach { key ->
+                    statusKeys.forEach { key ->
                         preferences.remove(key)
                     }
                 }
             }
             
-            // Update all papers to be marked as unread and update the flow
+            // Update all papers to clear their statuses and update the flow
             synchronized(papersLock) {
                 _papers.replaceAll { paper ->
-                    paper.markAsRead(false)
+                    paper
+                        .markAsRead(false)
+                        .markAsToRead(false)
+                        .markAsFavorite(false)
                 }
                 // Force update the flow with the modified papers
                 _papersFlow.value = _papers.toList()
@@ -154,7 +195,7 @@ class PaperRepository(
             updatePapersFlow()
             
         } catch (e: Exception) {
-            Log.e("PaperRepository", "Error clearing read statuses", e)
+            Log.e("PaperRepository", "Error clearing paper statuses", e)
             throw e
         }
     }

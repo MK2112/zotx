@@ -195,9 +195,9 @@ fun BibPDFApp(
                         onPaperClick = { paper ->
                             viewModel.openPdf(paper)
                         },
-                        onToggleReadStatus = { paperId, isRead ->
+                        onToggleStatus = { paperId, statusType, isActive ->
                             coroutineScope.launch {
-                                viewModel.paperRepository.togglePaperReadStatus(paperId, isRead)
+                                viewModel.togglePaperStatus(paperId, statusType, isActive)
                             }
                         }
                     )

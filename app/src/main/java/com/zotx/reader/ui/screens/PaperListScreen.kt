@@ -283,7 +283,21 @@ fun PaperCard(
 ) {
     // Helper function to handle status toggling
     val onStatusToggle = { statusType: String, isActive: Boolean ->
-        onToggleStatus(statusType, isActive)
+        // For favorite, just toggle its state without affecting other statuses
+        if (statusType == "favorite") {
+            onToggleStatus(statusType, isActive)
+        } else {
+            // For read/to-read, make them mutually exclusive
+            if (isActive) {
+                // If we're activating a status, deactivate the other one
+                if (statusType == "read") {
+                    onToggleStatus("toread", false)
+                } else if (statusType == "toread") {
+                    onToggleStatus("read", false)
+                }
+            }
+            onToggleStatus(statusType, isActive)
+        }
     }
     val paperStatus = paper.getDisplayStatus()
     val alpha = when (paperStatus) {
@@ -322,64 +336,72 @@ fun PaperCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Title row with status icons
+            // Title row with content and status buttons
             Row(
-                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Status icons
-                // To Read button
-                StatusIconButton(
-                    isActive = paperStatus == PaperStatus.TO_READ,
-                    activeIcon = Icons.Default.Bookmark,
-                    inactiveIcon = Icons.Outlined.BookmarkBorder,
-                    contentDescription = if (paperStatus == PaperStatus.TO_READ) "Mark as not to read" else "Mark as to read"
-                ) {
-                    onStatusToggle("toread", !paper.toRead)
-                }
-                
-                // Read/Unread button
-                StatusIconButton(
-                    isActive = paperStatus == PaperStatus.READ,
-                    activeIcon = Icons.Default.CheckCircle,
-                    inactiveIcon = Icons.Outlined.Circle,
-                    contentDescription = if (paperStatus == PaperStatus.READ) "Mark as unread" else "Mark as read"
-                ) {
-                    onStatusToggle("read", !paper.isRead)
-                }
-                
-                // Favorite button
-                StatusIconButton(
-                    isActive = paperStatus == PaperStatus.FAVORITE,
-                    activeIcon = Icons.Default.Star,
-                    inactiveIcon = Icons.Outlined.StarBorder,
-                    contentDescription = if (paperStatus == PaperStatus.FAVORITE) "Remove from favorites" else "Add to favorites"
-                ) {
-                    onStatusToggle("favorite", !paper.isFavorite)
-                }
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
-                // Title with academic styling and search highlighting
-                val title = paper.title
-                val highlightedTitle = highlightText(title, highlightQuery)
-                
-                Text(
-                    text = highlightedTitle,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = if (paperStatus == PaperStatus.FAVORITE) FontWeight.Bold else FontWeight.SemiBold,
-                        lineHeight = 32.sp,
-                        textDecoration = textDecoration
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                // Content section (title, authors, year)
+                Column(
                     modifier = Modifier.weight(1f)
-                )
+                ) {
+                    // Title with academic styling and search highlighting
+                    val title = paper.title
+                    val highlightedTitle = highlightText(title, highlightQuery)
+                    
+                    Text(
+                        text = highlightedTitle,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = if (paperStatus == PaperStatus.FAVORITE) FontWeight.Bold else FontWeight.SemiBold,
+                            lineHeight = 32.sp,
+                            textDecoration = textDecoration
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                
+                // Vertical stack of status buttons
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    // To Read button
+                    StatusIconButton(
+                        isActive = paperStatus == PaperStatus.TO_READ,
+                        activeIcon = Icons.Default.Bookmark,
+                        inactiveIcon = Icons.Outlined.BookmarkBorder,
+                        contentDescription = if (paperStatus == PaperStatus.TO_READ) "Mark as not to read" else "Mark as to read"
+                    ) {
+                        onStatusToggle("toread", !paper.toRead)
+                    }
+                    
+                    // Read/Unread button
+                    StatusIconButton(
+                        isActive = paperStatus == PaperStatus.READ,
+                        activeIcon = Icons.Default.CheckCircle,
+                        inactiveIcon = Icons.Outlined.Circle,
+                        contentDescription = if (paperStatus == PaperStatus.READ) "Mark as unread" else "Mark as read"
+                    ) {
+                        onStatusToggle("read", !paper.isRead)
+                    }
+                    
+                    // Favorite button (independent of read/to-read)
+                    StatusIconButton(
+                        isActive = paper.isFavorite,
+                        activeIcon = Icons.Default.Star,
+                        inactiveIcon = Icons.Outlined.StarBorder,
+                        contentDescription = if (paper.isFavorite) "Remove from favorites" else "Add to favorites"
+                    ) {
+                        onStatusToggle("favorite", !paper.isFavorite)
+                    }
+                }
             }
             
             // Content section with authors and year
             Column(
-                modifier = Modifier.padding(start = 32.dp) // Align with the start of the title text
+                modifier = Modifier.padding(top = 8.dp) // Add some space between title and authors
             ) {
                 // Authors with academic formatting and search highlighting
                 val authorsText = paper.authors.joinToString("; ") { it.trim() }
